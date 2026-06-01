@@ -1,8 +1,9 @@
 # Registry Agent (OpenAI Agents SDK)
 
-A CLI agent that uses your **MCP Registry catalog** as its tool source. You pick
-which servers (or specific tools) from the catalog, and the agent connects to them
-through the registry's per-server MCP endpoints and runs a chat loop.
+An agent layer over your **MCP Registry catalog**: build/save/run agents in a web UI,
+or drive them from a CLI / the invoke API. You pick which servers (or specific tools)
+from the catalog, and the agent connects to them through the registry's per-server MCP
+endpoints and runs an LLM tool-calling loop.
 
 ```
   catalog (registry)          you pick            agent loop
@@ -15,16 +16,26 @@ through the registry's per-server MCP endpoints and runs a chat loop.
 
 ## Run
 
+> The registry must be running first (the agent reads its catalog + routes through it).
+
+**Setup (first time):**
 ```bash
 cd agent
 python3.13 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+export OPENAI_API_KEY=sk-...                 # the agent's brain
+export REGISTRY_URL=http://localhost:8000    # optional (default)
+export AGENT_MODEL=gpt-4o-mini               # optional
+```
 
-export OPENAI_API_KEY=sk-...        # the agent's brain
-export REGISTRY_URL=http://localhost:8000   # optional
-export REGISTRY_USER=vikas                  # optional (identity in /mcp/<user>/...)
-export AGENT_MODEL=gpt-4o                    # optional
+**Web UI (recommended):**
+```bash
+uvicorn web:app --port 8800        # open http://localhost:8800
+```
+Build/save/run agents in the browser; per-server token fields for 🔑 servers.
 
+**CLI (alternative):**
+```bash
 python agent_cli.py
 ```
 

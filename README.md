@@ -194,6 +194,15 @@ A no-code **agent builder + chat UI + invoke API** lives in `agent/` (see
 over the catalog tools, and exposes `POST /v1/agents/{name}/invoke`. Per-server tokens
 entered in the builder are forwarded only to `forward_auth` servers, never stored.
 
+Run it (registry must be up first):
+```bash
+cd agent
+python3.13 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+export OPENAI_API_KEY=sk-...  REGISTRY_URL=http://localhost:8000
+uvicorn web:app --port 8800        # open http://localhost:8800
+```
+
 ## Before production — TODO
 
 - **Real auth** — replace the `X-User-Id` header and `/mcp/{user_id}` path with a
