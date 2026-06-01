@@ -55,7 +55,14 @@ docker run --rm -p 9003:9003 \
 
 It maps to pr-agent settings:
 `config.git_provider=bitbucket_server`, `bitbucket_server.url`,
-`bitbucket_server.bearer_token`, `openai.key`.
+`bitbucket_server.bearer_token` (or `.username` + `.password`), `openai.key`.
+
+### Auth (pick one)
+- **HTTP access token** — `BITBUCKET_SERVER_TOKEN`. Recommended, and **required for
+  git-clone operations** pr-agent performs for some commands.
+- **Username + password (basic auth)** — `BITBUCKET_SERVER_USERNAME` +
+  `BITBUCKET_SERVER_PASSWORD` (used when no token is set). Works for the API-based
+  commands; commands that need a local clone still require a token.
 
 > The server **starts and lists its tools without** pr-agent installed or
 > credentials set (pr-agent is imported lazily). That's enough to publish it to

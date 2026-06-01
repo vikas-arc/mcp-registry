@@ -52,17 +52,20 @@ def _configure() -> None:
     from pr_agent.config_loader import get_settings
 
     url = os.environ.get("BITBUCKET_SERVER_URL")
-    token = os.environ.get("BITBUCKET_SERVER_TOKEN")
     key = os.environ.get("OPENAI_KEY")
-    missing = [
-        name
-        for name, val in (
-            ("BITBUCKET_SERVER_URL", url),
-            ("BITBUCKET_SERVER_TOKEN", token),
-            ("OPENAI_KEY", key),
-        )
-        if not val
-    ]
+    # Auth: a bearer token, OR username + password (basic auth). pr-agent uses the
+    # token if set, else falls back to username/password.
+    token = os.environ.get("BITBUCKET_SERVER_TOKEN")
+    username = os.environ.get("BITBUCKET_SERVER_USERNAME")
+    password = os.environ.get("BITBUCKET_SERVER_PASSWORD")
+
+    missing = []
+    if not url:
+        missing.append("BITBUCKET_SERVER_URL")
+    if not key:
+        missing.append("OPENAI_KEY")
+    if not token and not (username and password):
+        missing.append("BITBUCKET_SERVER_TOKEN (or BITBUCKET_SERVER_USERNAME + BITBUCKET_SERVER_PASSWORD)")
     if missing:
         raise RuntimeError("Missing required env vars: " + ", ".join(missing))
 
@@ -70,7 +73,11 @@ def _configure() -> None:
     s.set("config.git_provider", "bitbucket_server")
     s.set("config.model", os.environ.get("PR_AGENT_MODEL", "gpt-4o"))
     s.set("bitbucket_server.url", url)
-    s.set("bitbucket_server.bearer_token", token)
+    if token:
+        s.set("bitbucket_server.bearer_token", token)
+    else:
+        s.set("bitbucket_server.username", username)
+        s.set("bitbucket_server.password", password)
     s.set("openai.key", key)
     _configured = True
 
