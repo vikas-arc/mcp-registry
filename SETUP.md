@@ -3,6 +3,23 @@
 End-to-end local setup: the registry, MongoDB, an MCP server, the web UI, and
 (optionally) the agent service.
 
+## Quick start (one command)
+
+On a machine with **Python 3.13** and **MongoDB running** (`brew services start
+mongodb-community@7.0` or `docker run -d -p 27017:27017 mongo:7`):
+
+```bash
+git clone https://github.com/vikas-arc/mcp-registry.git
+cd mcp-registry
+./scripts/dev-up.sh        # creates venv, starts registry + Atlassian MOCK, publishes it
+# → open http://localhost:8000/ui/
+./scripts/dev-down.sh      # stop everything
+```
+
+`dev-up.sh` brings it up with a **mock** Atlassian server (no credentials), so you can
+see it working immediately. Swap in the real servers using the steps below. For the
+manual / production path, read on.
+
 ## 0. Prerequisites
 
 - **Python 3.13** (the MCP SDK needs ≥3.10; 3.13 used here)
