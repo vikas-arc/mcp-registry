@@ -1,0 +1,13 @@
+# ⚠️  DO NOT use `pip install -r requirements.txt` — it FAILS.
+#
+# pr-agent hard-pins uvicorn==0.22.0; mcp needs a newer uvicorn, so a single
+# resolution is impossible. Install SEQUENTIALLY instead (run ./install.sh):
+#
+#   pip install pr-agent==0.35.0
+#   pip install "mcp>=1.5"
+#
+# This is safe at runtime — we use pr-agent's library API (PRAgent.handle_request),
+# not its bundled web server, so the bumped uvicorn/starlette don't matter.
+# Works on Python 3.13 and 3.12. This file documents the deps; it is not -r-installable.
+pr-agent==0.35.0
+mcp>=1.5

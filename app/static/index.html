@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCP Registry</title>
+  <style>
+    :root { --bg:#0f1115; --card:#1a1d24; --line:#2a2f3a; --fg:#e6e8ec; --mut:#9aa3b2; --acc:#4f8cff; --ok:#3ecf8e; --warn:#e0a955; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); }
+    header { padding:20px 28px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    header h1 { font-size:18px; margin:0; }
+    .who { margin-left:auto; display:flex; align-items:center; gap:8px; color:var(--mut); font-size:13px; }
+    .who input { background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:6px 10px; width:120px; }
+    main { max-width:920px; margin:0 auto; padding:24px 28px 60px; }
+    .mcpurl { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 16px; font-size:13px; color:var(--mut); }
+    .mcpurl code { color:var(--acc); user-select:all; }
+    details.integrate { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:0 16px; margin:12px 0 24px; }
+    details.integrate summary { cursor:pointer; padding:12px 0; font-size:13px; font-weight:600; color:var(--fg); list-style:none; }
+    details.integrate summary::-webkit-details-marker { display:none; }
+    details.integrate summary::before { content:"▸ "; color:var(--acc); }
+    details.integrate[open] summary::before { content:"▾ "; }
+    .step { padding:6px 0 14px; }
+    .step .lbl { font-size:12px; color:var(--mut); margin-bottom:6px; }
+    .step pre { margin:0; background:#0b0d11; border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow-x:auto; font-size:12.5px; }
+    .step pre code { color:#cdd3df; user-select:all; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+    .card h3 { margin:0; font-size:16px; display:flex; align-items:center; gap:8px; }
+    .badge { font-size:11px; padding:2px 8px; border-radius:20px; background:#222733; color:var(--mut); }
+    .badge.ok { color:var(--ok); } .badge.err { color:#ff6b6b; }
+    .badge.byot { color:var(--warn); }
+    .desc { color:var(--mut); font-size:13px; min-height:18px; }
+    .toolhdr { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); }
+    .tools { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:6px; }
+    .tools li { background:#13161c; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+    .tname { font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:var(--fg); font-weight:600; }
+    .tparams { color:var(--acc); }
+    .tdesc { font-size:12px; color:var(--mut); margin-top:3px; }
+    .row { display:flex; gap:8px; align-items:center; margin-top:auto; }
+    button { border:0; border-radius:8px; padding:8px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+    .connect { background:var(--acc); color:#fff; }
+    .disconnect { background:#2a2f3a; color:var(--fg); }
+    .connected { color:var(--ok); font-size:13px; font-weight:600; }
+    .srv { margin-top:2px; border-top:1px solid var(--line); padding-top:8px; }
+    .srv summary { cursor:pointer; font-size:12px; color:var(--mut); list-style:none; }
+    .srv summary::-webkit-details-marker { display:none; }
+    .srv summary::before { content:"▸ "; color:var(--acc); }
+    .srv[open] summary::before { content:"▾ "; }
+    .srv pre { margin:4px 0 2px; background:#0b0d11; border:1px solid var(--line); border-radius:8px; padding:8px 10px; overflow-x:auto; }
+    .srv pre code { font-size:11.5px; color:#cdd3df; user-select:all; }
+    .srv .srvlbl { font-size:11px; color:var(--mut); margin:8px 0 0; }
+    .add { margin-top:32px; border-top:1px solid var(--line); padding-top:20px; }
+    .add h2 { font-size:14px; color:var(--mut); font-weight:600; }
+    .add form { display:flex; gap:8px; flex-wrap:wrap; }
+    .add input { background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:8px 10px; }
+    .add input[name=name] { width:140px; } .add input[name=url] { flex:1; min-width:240px; }
+    .empty { color:var(--mut); padding:40px; text-align:center; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🧩 MCP Registry</h1>
+    <div class="who">
+      you are <input id="user" value="vikas" /> <span>(no auth yet — switch to act as a teammate)</span>
+    </div>
+  </header>
+  <main>
+    <div class="mcpurl">Your MCP endpoint: <code id="mcpurl"></code></div>
+    <details class="integrate">
+      <summary>How to connect this to your editor</summary>
+      <div class="step">
+        <div class="lbl">Claude Code — run in your terminal:</div>
+        <pre><code id="snip-claude"></code></pre>
+      </div>
+      <div class="step">
+        <div class="lbl">GitHub Copilot — add to <b>.vscode/mcp.json</b>:</div>
+        <pre><code id="snip-copilot"></code></pre>
+      </div>
+      <div class="step">
+        <div class="lbl">Cursor — add to <b>~/.cursor/mcp.json</b>:</div>
+        <pre><code id="snip-cursor"></code></pre>
+      </div>
+      <div class="step">
+        <div class="lbl">Windsurf — add to <b>~/.codeium/windsurf/mcp_config.json</b>:</div>
+        <pre><code id="snip-windsurf"></code></pre>
+      </div>
+      <div class="step lbl">After adding it, your editor lists every tool from the servers you've connected below. Connect/disconnect here and the editor picks it up on reconnect.</div>
+    </details>
+    <div class="grid" id="grid"><div class="empty">Loading catalog…</div></div>
+
+    <div class="add">
+      <h2>Admin · publish a custom server to the catalog</h2>
+      <form id="addform">
+        <input name="name" placeholder="Name (e.g. Reports)" required />
+        <input name="url" placeholder="https://your-server/mcp" required />
+        <button class="connect" type="submit">Publish</button>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const userInput = $("#user");
+    const user = () => userInput.value.trim() || "anon";
+    const hdr = () => ({ "X-User-Id": user(), "Content-Type": "application/json" });
+
+    function refreshUrl() {
+      const url = `${location.origin}/mcp/${user()}`;
+      $("#mcpurl").textContent = url;
+      $("#snip-claude").textContent = `claude mcp add --transport http team-registry ${url}`;
+      const json = { servers: { "team-registry": { type: "http", url } } };
+      $("#snip-copilot").textContent = JSON.stringify(json, null, 2);
+      $("#snip-cursor").textContent = JSON.stringify({ mcpServers: { "team-registry": { url } } }, null, 2);
+      $("#snip-windsurf").textContent = JSON.stringify({ mcpServers: { "team-registry": { serverUrl: url } } }, null, 2);
+    }
+
+    async function load() {
+      refreshUrl();
+      const res = await fetch("/catalog", { headers: hdr() });
+      const servers = await res.json();
+      const grid = $("#grid");
+      if (!servers.length) { grid.innerHTML = `<div class="empty">Catalog is empty — publish a server below.</div>`; return; }
+      grid.innerHTML = "";
+      for (const s of servers) {
+        const tools = await (await fetch(`/catalog/${s.id}/tools`)).json();
+        const card = document.createElement("div");
+        card.className = "card";
+        const statusBadge = s.status === "active"
+          ? `<span class="badge ok">● active</span>`
+          : `<span class="badge err">● ${s.status}</span>`;
+        const authBadge = s.forward_auth
+          ? `<span class="badge byot" title="Bring your own token: the caller's token is forwarded to this server">🔑 your token</span>`
+          : `<span class="badge" title="Uses the registry's shared/service credentials">shared</span>`;
+        const toolItems = tools.map(t => {
+          const params = Object.keys((t.input_schema && t.input_schema.properties) || {});
+          const sig = params.map(p => `<span class="tparams">${p}</span>`).join(", ");
+          return `<li>
+            <div class="tname">${t.name}(${sig})</div>
+            ${t.description ? `<div class="tdesc">${t.description}</div>` : ""}
+          </li>`;
+        }).join("") || `<li class="tdesc">no tools</li>`;
+        const srvUrl = `${location.origin}/mcp/${user()}/${s.slug}`;
+        const copilotSnip = JSON.stringify({ servers: { [s.slug]: { type:"http", url:srvUrl } } }, null, 2);
+        const windsurfSnip = JSON.stringify({ mcpServers: { [s.slug]: { serverUrl:srvUrl } } }, null, 2);
+        card.innerHTML = `
+          <h3>${s.name} ${statusBadge} ${authBadge}</h3>
+          <div class="desc">${s.description || ""}</div>
+          <div class="toolhdr">Tools (${tools.length})</div>
+          <ul class="tools">${toolItems}</ul>
+          <details class="srv">
+            <summary>Use just this server</summary>
+            <div class="srvlbl">Claude Code — terminal</div>
+            <pre><code>claude mcp add --transport http ${s.slug} ${srvUrl}</code></pre>
+            <div class="srvlbl">VS Code · GitHub Copilot — .vscode/mcp.json</div>
+            <pre><code>${copilotSnip}</code></pre>
+            <div class="srvlbl">Windsurf — ~/.codeium/windsurf/mcp_config.json</div>
+            <pre><code>${windsurfSnip}</code></pre>
+          </details>
+          <div class="row">
+            ${s.connected
+              ? `<span class="connected">✓ connected</span><button class="disconnect" data-dis="${s.id}">Disconnect</button>`
+              : `<button class="connect" data-con="${s.id}">Connect</button>`}
+          </div>`;
+        grid.appendChild(card);
+      }
+    }
+
+    document.addEventListener("click", async e => {
+      const con = e.target.getAttribute("data-con");
+      const dis = e.target.getAttribute("data-dis");
+      if (con) {
+        await fetch("/me/connections", { method:"POST", headers:hdr(), body:JSON.stringify({catalog_id:con}) });
+        load();
+      } else if (dis) {
+        await fetch(`/me/connections/${dis}`, { method:"DELETE", headers:hdr() });
+        load();
+      }
+    });
+
+    $("#addform").addEventListener("submit", async e => {
+      e.preventDefault();
+      const f = e.target;
+      const body = JSON.stringify({ name:f.name.value, base_url:f.url.value, transport:"http" });
+      const r = await fetch("/catalog", { method:"POST", headers:hdr(), body });
+      if (!r.ok) { alert("Publish failed: " + (await r.text())); return; }
+      f.reset(); load();
+    });
+
+    userInput.addEventListener("change", load);
+    load();
+  </script>
+</body>
+</html>

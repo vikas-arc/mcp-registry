@@ -1,0 +1,67 @@
+# Each MCP server = its own Deployment + Service (dependency isolation).
+# The registry reaches them by in-cluster DNS, e.g. http://atlassian-read.mcp.svc.cluster.local:9004/mcp
+# (publish those URLs to the catalog after deploy).
+# MCP /mcp needs POST, so readiness uses a TCP check rather than an HTTP GET.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: pr-agent, namespace: mcp, labels: { app: pr-agent } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pr-agent } }
+  template:
+    metadata: { labels: { app: pr-agent } }
+    spec:
+      containers:
+        - name: pr-agent
+          image: ACCOUNT.dkr.ecr.REGION.amazonaws.com/pr-agent-bbs:latest
+          ports: [{ containerPort: 9003 }]
+          env:
+            - { name: BITBUCKET_SERVER_URL, valueFrom: { configMapKeyRef: { name: mcp-config, key: BITBUCKET_SERVER_URL } } }
+            - { name: BITBUCKET_SERVER_TOKEN, valueFrom: { secretKeyRef: { name: mcp-secrets, key: BITBUCKET_SERVER_TOKEN } } }
+            - { name: OPENAI_KEY, valueFrom: { secretKeyRef: { name: mcp-secrets, key: OPENAI_KEY } } }
+            - { name: PR_AGENT_MODEL, valueFrom: { configMapKeyRef: { name: mcp-config, key: PR_AGENT_MODEL } } }
+          readinessProbe: { tcpSocket: { port: 9003 }, initialDelaySeconds: 10, periodSeconds: 15 }
+          resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { cpu: "500m", memory: "768Mi" } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: pr-agent, namespace: mcp }
+spec: { selector: { app: pr-agent }, ports: [{ port: 9003, targetPort: 9003 }] }
+---
+# ---- Atlassian (single instance, multi-user) ----
+# One server for BOTH read and write:
+#   - configured with the SHARED service account as the fallback (no-token reads)
+#   - catalog it with forward_auth=true, so the registry forwards a user's PAT when present
+#     → that request acts as the user (their reads + writes).
+# READ-ONLY ENFORCEMENT: the shared service account MUST have read-only permissions in
+# Jira/Confluence. Then a no-token write hits the service account and Atlassian denies it;
+# only a user's own token (with write perms) can write. (No READ_ONLY_MODE here, since the
+# write tools must still exist for token-bearing users.)
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: atlassian, namespace: mcp, labels: { app: atlassian } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: atlassian } }
+  template:
+    metadata: { labels: { app: atlassian } }
+    spec:
+      containers:
+        - name: atlassian
+          image: ghcr.io/sooperset/mcp-atlassian:latest
+          args: ["--transport","streamable-http","--port","9004","--path","/mcp"]
+          ports: [{ containerPort: 9004 }]
+          env:
+            - { name: JIRA_URL, valueFrom: { configMapKeyRef: { name: mcp-config, key: JIRA_URL } } }
+            - { name: CONFLUENCE_URL, valueFrom: { configMapKeyRef: { name: mcp-config, key: CONFLUENCE_URL } } }
+            # Shared READ-ONLY service account (fallback for no-token requests):
+            - { name: JIRA_PERSONAL_TOKEN, valueFrom: { secretKeyRef: { name: mcp-secrets, key: ATLASSIAN_SERVICE_PAT } } }
+            - { name: CONFLUENCE_PERSONAL_TOKEN, valueFrom: { secretKeyRef: { name: mcp-secrets, key: ATLASSIAN_SERVICE_PAT } } }
+          readinessProbe: { tcpSocket: { port: 9004 }, initialDelaySeconds: 10, periodSeconds: 15 }
+          resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { cpu: "500m", memory: "512Mi" } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: atlassian, namespace: mcp }
+spec: { selector: { app: atlassian }, ports: [{ port: 9004, targetPort: 9004 }] }

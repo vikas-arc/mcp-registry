@@ -1,0 +1,21 @@
+services:
+  db:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  api:
+    build: .
+    depends_on:
+      - db
+    environment:
+      MONGO_URL: mongodb://db:27017
+      MONGO_DB: mcp_registry
+      ALLOW_PRIVATE_NETWORKS: "false"
+    ports:
+      - "8000:8000"
+
+volumes:
+  mongodata:

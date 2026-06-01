@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent
+  namespace: mcp
+  labels: { app: agent }
+spec:
+  replicas: 1   # holds in-memory chat sessions; scale-out needs sticky sessions or shared store
+  selector:
+    matchLabels: { app: agent }
+  template:
+    metadata:
+      labels: { app: agent }
+    spec:
+      containers:
+        - name: agent
+          image: ACCOUNT.dkr.ecr.REGION.amazonaws.com/mcp-agent:latest
+          ports:
+            - containerPort: 8800
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom: { secretKeyRef: { name: mcp-secrets, key: OPENAI_API_KEY } }
+            - name: AGENT_API_KEY
+              valueFrom: { secretKeyRef: { name: mcp-secrets, key: AGENT_API_KEY } }
+            - name: REGISTRY_URL
+              valueFrom: { configMapKeyRef: { name: mcp-config, key: REGISTRY_URL } }
+            - name: AGENT_MODEL
+              valueFrom: { configMapKeyRef: { name: mcp-config, key: AGENT_MODEL } }
+          readinessProbe:
+            httpGet: { path: /, port: 8800 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits: { cpu: "500m", memory: "512Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent
+  namespace: mcp
+spec:
+  selector: { app: agent }
+  ports:
+    - port: 8800
+      targetPort: 8800

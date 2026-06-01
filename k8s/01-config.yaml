@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-config
+  namespace: mcp
+data:
+  # --- registry ---
+  MONGO_DB: "mcp_registry"
+  # In-cluster Services resolve to private ClusterIPs, which the SSRF guard would
+  # block. Allow private here. HARDENING: replace with a host allowlist of just the
+  # known MCP service names (see app/security/ssrf.py TODO) before opening publish to non-admins.
+  ALLOW_PRIVATE_NETWORKS: "true"
+
+  # --- agent service ---
+  REGISTRY_URL: "http://registry.mcp.svc.cluster.local:8000"
+  AGENT_MODEL: "gpt-4o-mini"
+
+  # --- atlassian (non-secret) ---
+  JIRA_URL: "https://jira.yourco.com"
+  CONFLUENCE_URL: "https://confluence.yourco.com"
+
+  # --- pr-agent (non-secret) ---
+  BITBUCKET_SERVER_URL: "https://bitbucket.yourco.com"
+  PR_AGENT_MODEL: "gpt-4o"

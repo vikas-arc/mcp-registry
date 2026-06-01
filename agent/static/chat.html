@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Registry Agent</title>
+  <style>
+    :root { --bg:#0f1115; --card:#1a1d24; --line:#2a2f3a; --fg:#e6e8ec; --mut:#9aa3b2; --acc:#4f8cff; --ok:#3ecf8e; --user:#274060; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--bg); color:var(--fg); height:100vh; display:flex; }
+    aside { width:340px; border-right:1px solid var(--line); padding:18px; overflow-y:auto; flex-shrink:0; }
+    aside h1 { font-size:16px; margin:0 0 4px; }
+    .who { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--mut); margin:10px 0 14px; }
+    .who input { background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:6px; padding:5px 8px; width:110px; }
+    h2.sec { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--mut); margin:18px 0 8px; border-top:1px solid var(--line); padding-top:14px; }
+    .agent { display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:9px; padding:8px 10px; margin-bottom:8px; }
+    .agent .nm { font-weight:600; font-size:13px; flex:1; }
+    .agent button { padding:5px 9px; font-size:12px; }
+    .run { background:var(--acc); color:#fff; } .del { background:#2a2f3a; color:var(--mut); }
+    .field { margin-bottom:8px; }
+    .field label { display:block; font-size:12px; color:var(--mut); margin-bottom:3px; }
+    .field input, .field textarea { width:100%; background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:8px 10px; font:inherit; font-size:13px; }
+    .sectk { font-size:11px; color:var(--warn,#e0a955); margin:10px 0 6px; }
+    .field textarea { resize:vertical; min-height:60px; }
+    .srv { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:8px; }
+    .srv > label { display:flex; align-items:center; gap:6px; font-weight:600; font-size:13px; cursor:pointer; }
+    .srv .tool { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--mut); font-family:ui-monospace,Menlo,monospace; margin:5px 0 0 0; cursor:pointer; }
+    .srv input[type=checkbox] { margin:0; flex:0 0 auto; width:14px; height:14px; }
+    button { border:0; border-radius:8px; padding:9px 14px; font-size:13px; font-weight:600; cursor:pointer; }
+    .primary { background:var(--acc); color:#fff; } .ghost { background:#2a2f3a; color:var(--fg); }
+    .btnrow { display:flex; gap:8px; margin-top:8px; }
+    .btnrow button { flex:1; }
+    main { flex:1; display:flex; flex-direction:column; }
+    .status { padding:10px 18px; border-bottom:1px solid var(--line); font-size:12px; color:var(--mut); }
+    .status b { color:var(--ok); }
+    .msgs { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:12px; }
+    .msg { max-width:760px; padding:10px 14px; border-radius:12px; white-space:pre-wrap; }
+    .msg.user { background:var(--user); align-self:flex-end; }
+    .msg.agent { background:var(--card); border:1px solid var(--line); align-self:flex-start; }
+    .msg.tool { align-self:flex-start; font-size:12px; color:var(--mut); font-family:ui-monospace,Menlo,monospace; }
+    .empty { color:var(--mut); margin:auto; text-align:center; }
+    .composer { display:flex; gap:10px; padding:14px 18px; border-top:1px solid var(--line); }
+    .composer input { flex:1; background:var(--card); border:1px solid var(--line); color:var(--fg); border-radius:10px; padding:11px 14px; font-size:14px; }
+    .composer button { background:var(--acc); color:#fff; }
+    .composer input:disabled, .composer button:disabled { opacity:.5; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <aside>
+    <h1>🤖 Registry Agent</h1>
+    <div class="who">you are <input id="user" value="vikas" /></div>
+
+    <h2 class="sec">Saved agents</h2>
+    <div id="agents"></div>
+
+    <h2 class="sec">Build an agent</h2>
+    <div class="field"><label>Name</label><input id="aname" placeholder="e.g. Ops Helper" /></div>
+    <div class="field"><label>System prompt</label><textarea id="aprompt" placeholder="You are a helpful assistant that…"></textarea></div>
+    <div class="field"><label>Model</label><input id="amodel" value="gpt-4o-mini" /></div>
+    <div class="field"><label>Tools</label><div id="catalog"></div></div>
+    <div id="tokens"></div>
+    <div class="btnrow">
+      <button class="ghost" id="saveBtn">Save agent</button>
+      <button class="primary" id="startBtn">Start now</button>
+    </div>
+    <button class="ghost" id="stopBtn" style="display:none; width:100%; margin-top:8px;">Stop session</button>
+  </aside>
+
+  <main>
+    <div class="status" id="status">Build an agent or run a saved one to begin.</div>
+    <div class="msgs" id="msgs"><div class="empty">No conversation yet.</div></div>
+    <div class="composer">
+      <input id="input" placeholder="Ask the agent to do something…" disabled />
+      <button id="sendBtn" disabled>Send</button>
+    </div>
+  </main>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const api = (p, body, method="POST") => fetch(p, { method, headers:{"Content-Type":"application/json"}, body: body?JSON.stringify(body):undefined });
+    let sessionId = null;
+    const FWD = {};    // slug -> forward_auth (needs a token)
+    const NAMES = {};  // slug -> display name
+    const user = () => $("#user").value.trim() || "anon";
+
+    async function loadCatalog() {
+      const servers = await (await fetch(`/api/catalog?user=${encodeURIComponent(user())}`)).json();
+      const box = $("#catalog");
+      if (!servers.length) { box.innerHTML = `<div style="color:var(--mut);font-size:12px">Catalog empty.</div>`; renderTokenFields(); return; }
+      servers.forEach(s => { FWD[s.slug] = s.forward_auth; NAMES[s.slug] = s.name; });
+      box.innerHTML = servers.map(s => `
+        <div class="srv">
+          <label><input type="checkbox" class="srvchk" value="${s.slug}" checked /><span>${s.name}${s.forward_auth ? ' 🔑' : ''}</span></label>
+          ${s.tools.map(t => `<label class="tool"><input type="checkbox" class="toolchk" data-slug="${s.slug}" value="${t.namespaced_name}" checked /><span>${t.name}</span></label>`).join("")}
+        </div>`).join("");
+      box.querySelectorAll(".srvchk").forEach(chk => chk.addEventListener("change", e =>
+        box.querySelectorAll(`.toolchk[data-slug="${e.target.value}"]`).forEach(t => t.checked = e.target.checked)));
+      renderTokenFields();
+    }
+
+    function selectedForwardAuthSlugs() {
+      const out = [];
+      document.querySelectorAll(".srvchk").forEach(srv => {
+        const tools = [...document.querySelectorAll(`.toolchk[data-slug="${srv.value}"]`)];
+        const inPlay = srv.checked || tools.some(t => t.checked);
+        if (inPlay && FWD[srv.value]) out.push(srv.value);
+      });
+      return out;
+    }
+
+    function renderTokenFields() {
+      const prev = {};
+      document.querySelectorAll("[data-token-slug]").forEach(i => prev[i.dataset.tokenSlug] = i.value);
+      const slugs = selectedForwardAuthSlugs();
+      $("#tokens").innerHTML = slugs.length
+        ? `<div class="sectk">🔑 Tokens — each sent only to that server, never saved</div>` + slugs.map(sl =>
+            `<div class="field"><label>${NAMES[sl] || sl}</label>` +
+            `<input type="password" data-token-slug="${sl}" placeholder="your token (optional)" value="${prev[sl] || ''}" /></div>`).join("")
+        : "";
+    }
+
+    function collectTokens() {
+      const t = {};
+      document.querySelectorAll("[data-token-slug]").forEach(i => { if (i.value.trim()) t[i.dataset.tokenSlug] = i.value.trim(); });
+      return t;
+    }
+
+    function selection() {
+      const sel = [];
+      document.querySelectorAll(".srvchk").forEach(srv => {
+        const tools = [...document.querySelectorAll(`.toolchk[data-slug="${srv.value}"]`)];
+        const checked = tools.filter(t => t.checked);
+        if (!srv.checked && checked.length === 0) return;
+        if (checked.length === tools.length && srv.checked) sel.push(srv.value);
+        else checked.forEach(t => sel.push(t.value));
+      });
+      return sel;
+    }
+
+    function setSelection(list) {
+      const set = new Set(list || []);
+      document.querySelectorAll(".srvchk").forEach(srv => {
+        const whole = set.has(srv.value) || (set.size===1 && [...set][0]==="all") || set.has("all");
+        srv.checked = whole;
+        document.querySelectorAll(`.toolchk[data-slug="${srv.value}"]`).forEach(t => t.checked = whole || set.has(t.value));
+      });
+    }
+
+    async function loadAgents() {
+      const list = await (await fetch(`/api/agents?user=${encodeURIComponent(user())}`)).json();
+      const box = $("#agents");
+      box.innerHTML = list.length ? "" : `<div style="color:var(--mut);font-size:12px">None yet — build one below.</div>`;
+      list.forEach(a => {
+        const row = document.createElement("div");
+        row.className = "agent";
+        row.innerHTML = `<span class="nm">${a.name}</span>
+          <button class="run">Run</button><button class="del">✕</button>`;
+        row.querySelector(".run").onclick = () => runAgent(a);
+        row.querySelector(".del").onclick = async () => { await api(`/api/agents/${a.id}?user=${encodeURIComponent(user())}`, null, "DELETE"); loadAgents(); };
+        box.appendChild(row);
+      });
+    }
+
+    function addMsg(role, text) {
+      const m = $("#msgs"); if (m.querySelector(".empty")) m.innerHTML = "";
+      const d = document.createElement("div"); d.className = `msg ${role}`; d.textContent = text;
+      m.appendChild(d); m.scrollTop = m.scrollHeight; return d;
+    }
+
+    async function startSession(payload, label) {
+      $("#status").textContent = "Starting…";
+      const r = await api("/api/start", payload);
+      if (!r.ok) { $("#status").textContent = "Start failed."; alert("Start failed: " + (await r.text())); return; }
+      const d = await r.json();
+      sessionId = d.session_id;
+      $("#status").innerHTML = `${label} · servers: <b>${d.servers.join(", ")}</b> · ${d.tools.length} tools`;
+      $("#input").disabled = false; $("#sendBtn").disabled = false; $("#input").focus();
+      $("#stopBtn").style.display = "block";
+      $("#msgs").innerHTML = `<div class="empty">Agent ready — say something.</div>`;
+    }
+
+    async function runAgent(a) {
+      setSelection(a.selection);
+      $("#aname").value = a.name; $("#aprompt").value = a.instructions || ""; $("#amodel").value = a.model || "gpt-4o-mini";
+      renderTokenFields();
+      await startSession({ user:user(), selection:a.selection, instructions:a.instructions, model:a.model, tokens: collectTokens() }, `Agent <b style="color:var(--fg)">${a.name}</b>`);
+    }
+
+    $("#startBtn").onclick = () => {
+      const sel = selection();
+      if (!sel.length) { alert("Select at least one server or tool."); return; }
+      startSession({ user:user(), selection:sel, instructions: $("#aprompt").value.trim() || null, model: $("#amodel").value.trim() || null, tokens: collectTokens() }, "Ad-hoc agent");
+    };
+
+    $("#saveBtn").onclick = async () => {
+      const name = $("#aname").value.trim();
+      if (!name) { alert("Give the agent a name."); return; }
+      const sel = selection();
+      if (!sel.length) { alert("Select at least one server or tool."); return; }
+      const r = await api(`/api/agents?user=${encodeURIComponent(user())}`, { name, instructions:$("#aprompt").value.trim(), selection:sel, model:$("#amodel").value.trim() || null });
+      if (!r.ok) { alert("Save failed: " + (await r.text())); return; }
+      loadAgents();
+    };
+
+    $("#stopBtn").onclick = async () => {
+      if (sessionId) await api("/api/stop", { session_id:sessionId, message:"" });
+      sessionId = null;
+      $("#status").textContent = "Stopped.";
+      $("#input").disabled = true; $("#sendBtn").disabled = true; $("#stopBtn").style.display = "none";
+    };
+
+    async function send() {
+      const text = $("#input").value.trim();
+      if (!text || !sessionId) return;
+      $("#input").value = ""; addMsg("user", text);
+      $("#input").disabled = true; $("#sendBtn").disabled = true;
+      const thinking = addMsg("tool", "…thinking");
+      const r = await api("/api/chat", { session_id:sessionId, message:text });
+      thinking.remove();
+      addMsg("agent", r.ok ? (await r.json()).reply : "⚠️ " + (await r.text()));
+      $("#input").disabled = false; $("#sendBtn").disabled = false; $("#input").focus();
+    }
+    $("#sendBtn").onclick = send;
+    $("#input").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+    $("#user").addEventListener("change", () => { loadCatalog(); loadAgents(); });
+    $("#catalog").addEventListener("change", renderTokenFields);  // server/tool toggles → refresh token fields
+
+    loadCatalog(); loadAgents();
+  </script>
+</body>
+</html>
