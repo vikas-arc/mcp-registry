@@ -25,6 +25,21 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("PR Agent (Bitbucket Server)", host="127.0.0.1", port=9003)
 
+
+def _load_dotenv() -> None:
+    """Load a local .env (so `cp .env.example .env && python server.py` works)."""
+    path = os.path.join(os.path.dirname(__file__), ".env")
+    if not os.path.exists(path):
+        return
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_dotenv()
 _configured = False
 
 

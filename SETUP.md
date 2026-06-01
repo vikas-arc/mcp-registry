@@ -67,25 +67,37 @@ Health check: `curl localhost:8000/health` → `{"status":"ok"}`.
 
 ## 5. Run an MCP server
 
-Pick one. Each must be reachable from the registry.
+Each server is its **own process** (own terminal / background / Docker), started
+separately from the registry, and must be reachable from it. Each lives in its own
+folder under `servers/` (or `examples/` for the credential-free demos).
 
 **Quick test (no creds) — Atlassian mock:**
 ```bash
 ATL_MODE=all ATL_PORT=9004 python examples/atlassian_mock.py    # http://127.0.0.1:9004/mcp
 ```
 
-**Real Atlassian (Jira + Confluence Server/DC):**
+**Real Atlassian (Jira + Confluence Server/DC) — `servers/atlassian/`:**
 1. Create a **read-only** Personal Access Token in Jira (avatar → Profile → Personal
    Access Tokens) and another in Confluence.
-2. Run it (the host must be able to reach your Jira/Confluence URLs):
+2. Install, configure, run (the host must reach your Jira/Confluence URLs):
    ```bash
-   JIRA_URL=https://jira.yourco.com              JIRA_PERSONAL_TOKEN=<jira PAT> \
-   CONFLUENCE_URL=https://confluence.yourco.com  CONFLUENCE_PERSONAL_TOKEN=<conf PAT> \
-   uvx mcp-atlassian --transport streamable-http --port 9004 --path /mcp -v
+   cd servers/atlassian
+   ./install.sh                       # venv + mcp-atlassian
+   cp .env.example .env               # fill JIRA_URL / tokens / CONFLUENCE_URL
+   ./.venv/bin/python server.py       # http://127.0.0.1:9004/mcp
    ```
-   Add `JIRA_SSL_VERIFY=false CONFLUENCE_SSL_VERIFY=false` only for self-signed certs.
+   (Set `JIRA_SSL_VERIFY=false` / `CONFLUENCE_SSL_VERIFY=false` in `.env` for self-signed certs.)
 
-**Real PR-Agent (Bitbucket Server):** see `servers/pr_agent_bitbucket/README.md`.
+**Real PR-Agent (Bitbucket Server) — `servers/pr_agent_bitbucket/`:**
+```bash
+cd servers/pr_agent_bitbucket
+./install.sh                          # pr-agent, then mcp (two-step)
+cp .env.example .env                  # fill BITBUCKET_SERVER_URL / token / OPENAI_KEY
+./.venv/bin/python server.py          # http://127.0.0.1:9003/mcp
+```
+
+> Each server runs on its own port — give them distinct `ATL_PORT`/ports if you run
+> several. Use separate terminals, or background them (`nohup … &`) / Docker / systemd.
 
 ## 6. Publish the server to the catalog
 
