@@ -56,7 +56,8 @@ REST endpoints take an `X-User-Id` header (auth stub — see `app/deps.py`).
 | DELETE | `/me/connections/{catalog_id}` | teammate | Disconnect |
 | GET | `/gateway/tools` | teammate | Your aggregated namespaced tools (REST) |
 | POST | `/gateway/tools/call` | teammate | Call a tool (REST, for testing) |
-| — | `/mcp/{user_id}` | MCP client | **The endpoint Copilot/Claude/Cursor connect to** |
+| — | `/mcp/{user_id}` | MCP client | Aggregate endpoint — all the user's connected servers |
+| — | `/mcp/{user_id}/{slug}` | MCP client | Single-server endpoint — just one catalog server |
 
 ## Run it end-to-end
 
@@ -64,13 +65,13 @@ REST endpoints take an `X-User-Id` header (auth stub — see `app/deps.py`).
 
 ```bash
 cd ~/Workspace/mcp-registry
-python3.12 -m venv .venv && source .venv/bin/activate
+python3.13 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env          # for local testing set ALLOW_PRIVATE_NETWORKS=true
 docker compose up -d db       # MongoDB; or point MONGO_URL at your own
 ```
 
-**1. Start a sample custom server** (stands in for one of your real ones):
+**1. Start a sample custom server** (a demo stand-in — see "Running the MCP servers" below for the real ones):
 ```bash
 python examples/sample_server.py        # streamable HTTP at http://127.0.0.1:9001/mcp
 ```
@@ -127,12 +128,70 @@ A minimal browse-and-connect page is served at **http://localhost:8000/ui/**:
   Copilot / Claude / Cursor.
 - An admin row at the bottom to publish a new server to the catalog.
 
-## Two sample servers
+## Running the MCP servers
 
-`examples/sample_server.py` (Orders, :9001) and `examples/inventory_server.py`
-(Inventory, :9002) let you demo teammates picking different subsets — e.g. vikas
-connects Orders, alice connects Inventory, and each `/mcp/<user>` exposes only
-their picks.
+The registry only **catalogs and routes to** MCP servers — each server runs as its
+own process/container and is added to the catalog **by URL**. So "adding a server"
+is: run it somewhere reachable, then `POST /catalog` with its URL. This repo ships
+three kinds:
+
+### a) Example servers — for trying it out, no credentials
+
+| Server | Run | Endpoint |
+| --- | --- | --- |
+| Orders (demo) | `python examples/sample_server.py` | `http://127.0.0.1:9001/mcp` |
+| Inventory (demo) | `python examples/inventory_server.py` | `http://127.0.0.1:9002/mcp` |
+| Atlassian **mock** | `ATL_MODE=all ATL_PORT=9004 python examples/atlassian_mock.py` | `http://127.0.0.1:9004/mcp` |
+
+The Atlassian mock advertises the *real* mcp-atlassian tool names (Jira + Confluence)
+as no-op stubs, so you can see them in the UI without any credentials.
+
+### b) PR-Agent (Bitbucket Server) — real
+
+Wraps [qodo-ai/pr-agent](https://github.com/qodo-ai/pr-agent). Needs a **two-step
+install** (see `servers/pr_agent_bitbucket/README.md` for why):
+
+```bash
+cd servers/pr_agent_bitbucket
+python3.13 -m venv .venv && source .venv/bin/activate
+./install.sh                                   # pr-agent, then mcp
+export BITBUCKET_SERVER_URL=https://bitbucket.yourco.com \
+       BITBUCKET_SERVER_TOKEN=<http access token> OPENAI_KEY=<key>
+python server.py                               # http://127.0.0.1:9003/mcp
+```
+
+### c) Atlassian (Jira + Confluence Server/DC) — real
+
+Uses [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian). One
+instance, multi-user (no separate read/write servers):
+
+```bash
+JIRA_URL=https://jira.yourco.com              JIRA_PERSONAL_TOKEN=<service PAT> \
+CONFLUENCE_URL=https://confluence.yourco.com  CONFLUENCE_PERSONAL_TOKEN=<service PAT> \
+uvx mcp-atlassian --transport streamable-http --port 9004 --path /mcp
+```
+
+The shared **service-account PAT must be read-only**. A user's own PAT — forwarded by
+the registry when the catalog entry has `forward_auth: true` — takes precedence and
+enables writes **as that user**.
+
+### Publish any server to the catalog
+
+```bash
+curl -X POST localhost:8000/catalog -H 'Content-Type: application/json' \
+  -d '{"name":"Atlassian","base_url":"http://127.0.0.1:9004/mcp","transport":"http","forward_auth":true}'
+```
+
+- `forward_auth: true` → the caller's `Authorization` token is passed through to that
+  server (bring-your-own-token). Omit it for servers that use shared credentials.
+- After it's published, refresh the UI; teammates can connect it and select its tools.
+
+## Agent service (optional)
+
+A no-code **agent builder + chat UI + invoke API** lives in `agent/` (see
+`agent/README.md`). It connects to this registry, lets you build/save/run LLM agents
+over the catalog tools, and exposes `POST /v1/agents/{name}/invoke`. Per-server tokens
+entered in the builder are forwarded only to `forward_auth` servers, never stored.
 
 ## Before production — TODO
 
