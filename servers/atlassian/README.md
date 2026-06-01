@@ -27,6 +27,14 @@ docker run --rm -p 9004:9004 \
   atlassian-mcp
 ```
 
+## Auth options (Server/DC)
+
+Per product, pick one (auto-detected — PAT wins if set):
+- **Personal Access Token**: `JIRA_PERSONAL_TOKEN` / `CONFLUENCE_PERSONAL_TOKEN`
+- **Username + password (basic auth)**: `JIRA_USERNAME` + `JIRA_API_TOKEN` and/or
+  `CONFLUENCE_USERNAME` + `CONFLUENCE_API_TOKEN`. On Server/DC the `*_API_TOKEN` field
+  holds your **password** (it doubles as the password — there is no `*_PASSWORD` var).
+
 ## Auth model (read shared, write per-user)
 - The tokens in `.env` should be a **read-only service account** → no-token requests
   (general reads) use it; Atlassian denies writes via it.
