@@ -162,18 +162,19 @@ python server.py                               # http://127.0.0.1:9003/mcp
 
 ### c) Atlassian (Jira + Confluence Server/DC) — real
 
-Uses [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian). One
-instance, multi-user (no separate read/write servers):
+Packaged in **`servers/atlassian/`** (engine: [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian)).
+One instance serves both Jira and Confluence:
 
 ```bash
-JIRA_URL=https://jira.yourco.com              JIRA_PERSONAL_TOKEN=<service PAT> \
-CONFLUENCE_URL=https://confluence.yourco.com  CONFLUENCE_PERSONAL_TOKEN=<service PAT> \
-uvx mcp-atlassian --transport streamable-http --port 9004 --path /mcp
+cd servers/atlassian
+./install.sh                       # venv + mcp-atlassian
+cp .env.example .env               # fill JIRA_URL / tokens / CONFLUENCE_URL
+./.venv/bin/python server.py       # http://127.0.0.1:9004/mcp
 ```
 
 The shared **service-account PAT must be read-only**. A user's own PAT — forwarded by
 the registry when the catalog entry has `forward_auth: true` — takes precedence and
-enables writes **as that user**.
+enables writes **as that user**. See `servers/atlassian/README.md` for details/Docker.
 
 ### Publish any server to the catalog
 

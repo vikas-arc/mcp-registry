@@ -1,0 +1,3 @@
+# Atlassian MCP server (Jira + Confluence). The engine is the third-party
+# mcp-atlassian package; this folder just packages how we run it.
+mcp-atlassian
